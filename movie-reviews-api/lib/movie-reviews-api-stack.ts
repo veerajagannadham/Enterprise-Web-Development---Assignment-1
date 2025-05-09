@@ -8,22 +8,21 @@ export class MovieReviewsApiStack extends cdk.Stack {
   constructor(scope: cdk.App, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    // ✅ Create DynamoDB Table for storing reviews
+    // ✅ Create DynamoDB Table
     const movieReviewsTable = new dynamodb.Table(this, "MovieReviewsTable", {
       partitionKey: { name: "MovieId", type: dynamodb.AttributeType.NUMBER },
       sortKey: { name: "ReviewId", type: dynamodb.AttributeType.NUMBER },
       tableName: "MovieReviews",
-      removalPolicy: cdk.RemovalPolicy.DESTROY, // Auto-delete when stack is removed
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
-    // ✅ Lambda function for fetching all movies & single movie
+    // ✅ Lambda functions
     const getMoviesLambda = new lambda.Function(this, "GetMoviesHandler", {
       runtime: lambda.Runtime.NODEJS_18_X,
       handler: "getMovies.handler",
       code: lambda.Code.fromAsset("lambda"),
     });
 
-    // ✅ Lambda function for adding a movie review (POST /movies/reviews)
     const postReviewLambda = new lambda.Function(this, "PostReviewHandler", {
       runtime: lambda.Runtime.NODEJS_18_X,
       handler: "postReview.handler",
@@ -31,7 +30,6 @@ export class MovieReviewsApiStack extends cdk.Stack {
       environment: { TABLE_NAME: movieReviewsTable.tableName },
     });
 
-    // ✅ Lambda function for updating a review (PUT /movies/{movieId}/reviews/{reviewId})
     const updateReviewLambda = new lambda.Function(this, "UpdateReviewHandler", {
       runtime: lambda.Runtime.NODEJS_18_X,
       handler: "updateReview.handler",
@@ -39,7 +37,13 @@ export class MovieReviewsApiStack extends cdk.Stack {
       environment: { TABLE_NAME: movieReviewsTable.tableName },
     });
 
-    // ✅ Lambda function for translating a review (GET /reviews/{reviewId}/{movieId}/translation)
+    const deleteReviewLambda = new lambda.Function(this, "DeleteReviewHandler", {
+      runtime: lambda.Runtime.NODEJS_18_X,
+      handler: "deleteReview.handler",
+      code: lambda.Code.fromAsset("lambda"),
+      environment: { TABLE_NAME: movieReviewsTable.tableName },
+    });
+
     const getTranslatedReviewLambda = new lambda.Function(this, "GetTranslatedReviewHandler", {
       runtime: lambda.Runtime.NODEJS_18_X,
       handler: "getTranslatedReview.handler",
@@ -47,39 +51,37 @@ export class MovieReviewsApiStack extends cdk.Stack {
       environment: { TABLE_NAME: movieReviewsTable.tableName },
     });
 
-    // ✅ Grant Lambda functions permission to read/write from DynamoDB
+    // ✅ Grant DynamoDB permissions
     movieReviewsTable.grantReadWriteData(postReviewLambda);
     movieReviewsTable.grantReadWriteData(updateReviewLambda);
+    movieReviewsTable.grantReadWriteData(deleteReviewLambda);
     movieReviewsTable.grantReadWriteData(getTranslatedReviewLambda);
 
-    // ✅ Grant AWS Translate permissions for translation Lambda
+    // ✅ AWS Translate permission
     getTranslatedReviewLambda.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ["translate:TranslateText"],
-        resources: ["*"], // Can be restricted further if needed
+        resources: ["*"],
       })
     );
 
     // ✅ Create API Gateway
-    const api = new apigateway.RestApi(this, "MovieReviewsApi");
+    const api = new apigateway.RestApi(this, "MovieReviewsApi",);
 
-    // ✅ Route for fetching all movies
+    // ✅ Routes
     const moviesResource = api.root.addResource("movies");
     moviesResource.addMethod("GET", new apigateway.LambdaIntegration(getMoviesLambda));
 
-    // ✅ Route for fetching a single movie by ID (/movies/{movieId})
     const movieResource = moviesResource.addResource("{movieId}");
     movieResource.addMethod("GET", new apigateway.LambdaIntegration(getMoviesLambda));
 
-    // ✅ Route for adding a review (POST /movies/reviews)
     const reviewsResource = moviesResource.addResource("reviews");
     reviewsResource.addMethod("POST", new apigateway.LambdaIntegration(postReviewLambda));
 
-    // ✅ Route for updating a review (PUT /movies/{movieId}/reviews/{reviewId})
     const reviewResource = movieResource.addResource("reviews").addResource("{reviewId}");
     reviewResource.addMethod("PUT", new apigateway.LambdaIntegration(updateReviewLambda));
+    reviewResource.addMethod("DELETE", new apigateway.LambdaIntegration(deleteReviewLambda));
 
-    // ✅ Route for getting translated review (GET /reviews/{reviewId}/{movieId}/translation?language=code)
     const translationsResource = api.root
       .addResource("reviews")
       .addResource("{reviewId}")
