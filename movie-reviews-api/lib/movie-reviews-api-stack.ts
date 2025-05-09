@@ -8,7 +8,7 @@ export class MovieReviewsApiStack extends cdk.Stack {
   constructor(scope: cdk.App, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    // ✅ Create DynamoDB Table
+    // Create DynamoDB Table
     const movieReviewsTable = new dynamodb.Table(this, "MovieReviewsTable", {
       partitionKey: { name: "MovieId", type: dynamodb.AttributeType.NUMBER },
       sortKey: { name: "ReviewId", type: dynamodb.AttributeType.NUMBER },
@@ -16,7 +16,7 @@ export class MovieReviewsApiStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
-    // ✅ Lambda functions
+    // Lambda functions
     const getMoviesLambda = new lambda.Function(this, "GetMoviesHandler", {
       runtime: lambda.Runtime.NODEJS_18_X,
       handler: "getMovies.handler",
@@ -51,13 +51,21 @@ export class MovieReviewsApiStack extends cdk.Stack {
       environment: { TABLE_NAME: movieReviewsTable.tableName },
     });
 
-    // ✅ Grant DynamoDB permissions
+    const fantasyMoviesLambda = new lambda.Function(this, "FantasyMovieCreator", {
+      runtime: lambda.Runtime.NODEJS_18_X,
+      handler: "createFantasyMovie.handler",
+      code: lambda.Code.fromAsset("lambda"),
+      environment: { TABLE_NAME: movieReviewsTable.tableName },
+    });
+
+    // Grant DynamoDB permissions
     movieReviewsTable.grantReadWriteData(postReviewLambda);
     movieReviewsTable.grantReadWriteData(updateReviewLambda);
     movieReviewsTable.grantReadWriteData(deleteReviewLambda);
     movieReviewsTable.grantReadWriteData(getTranslatedReviewLambda);
+    movieReviewsTable.grantReadWriteData(fantasyMoviesLambda);
 
-    // ✅ AWS Translate permission
+    // AWS Translate permission
     getTranslatedReviewLambda.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ["translate:TranslateText"],
@@ -65,10 +73,22 @@ export class MovieReviewsApiStack extends cdk.Stack {
       })
     );
 
-    // ✅ Create API Gateway
-    const api = new apigateway.RestApi(this, "MovieReviewsApi",);
+    // Create API Gateway with CORS enabled by default
+    const api = new apigateway.RestApi(this, "MovieReviewsApi", {
+      defaultCorsPreflightOptions: {
+        allowOrigins: apigateway.Cors.ALL_ORIGINS,
+        allowMethods: apigateway.Cors.ALL_METHODS,
+        allowHeaders: [
+          'Content-Type',
+          'X-Amz-Date',
+          'Authorization',
+          'X-Api-Key',
+          'X-Amz-Security-Token'
+        ],
+      },
+    });
 
-    // ✅ Routes
+    // Movies routes
     const moviesResource = api.root.addResource("movies");
     moviesResource.addMethod("GET", new apigateway.LambdaIntegration(getMoviesLambda));
 
@@ -82,11 +102,16 @@ export class MovieReviewsApiStack extends cdk.Stack {
     reviewResource.addMethod("PUT", new apigateway.LambdaIntegration(updateReviewLambda));
     reviewResource.addMethod("DELETE", new apigateway.LambdaIntegration(deleteReviewLambda));
 
+    // Translation route
     const translationsResource = api.root
       .addResource("reviews")
       .addResource("{reviewId}")
       .addResource("{movieId}")
       .addResource("translation");
     translationsResource.addMethod("GET", new apigateway.LambdaIntegration(getTranslatedReviewLambda));
+
+    // Fantasy movies route
+    const fantasyMoviesResource = api.root.addResource("fantasy").addResource("movies");
+    fantasyMoviesResource.addMethod("POST", new apigateway.LambdaIntegration(fantasyMoviesLambda));
   }
 }

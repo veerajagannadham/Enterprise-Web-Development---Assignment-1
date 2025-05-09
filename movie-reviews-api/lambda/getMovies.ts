@@ -11,6 +11,11 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     if (!movieId) {
       return {
         statusCode: 200,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Credentials": true,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify(movies),
       };
     }
@@ -20,21 +25,35 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     if (!movie) {
       return {
         statusCode: 404,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Credentials": true,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({ message: "Movie not found" }),
       };
     }
 
-    // Fetch reviews for this movie
     const movieReviews = reviews.filter((r) => r.movieId === Number(movieId));
 
     return {
       statusCode: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Credentials": true,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ movie, reviews: movieReviews }),
     };
   } catch (error) {
     console.error("Error fetching movie:", error);
     return {
       statusCode: 500,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Credentials": true,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ message: "Internal Server Error" }),
     };
   }
