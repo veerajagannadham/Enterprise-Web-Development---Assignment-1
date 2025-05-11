@@ -2,8 +2,28 @@ import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { movies } from "./movies";
 import { reviews } from "./reviews";
 
+// Define CORS headers in one place for consistency
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*", // For production, replace with specific origin
+  "Access-Control-Allow-Credentials": false, // Set to true if using credentials
+  "Content-Type": "application/json",
+};
+
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   console.log("Received event:", JSON.stringify(event, null, 2));
+
+  // Handle OPTIONS request for CORS preflight
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers: {
+        ...corsHeaders,
+        "Access-Control-Allow-Methods": "GET,OPTIONS", // Add other methods if needed
+        "Access-Control-Allow-Headers": "Content-Type", // Add other headers if needed
+      },
+      body: '',
+    };
+  }
 
   try {
     const movieId = event.pathParameters?.movieId;
@@ -11,11 +31,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     if (!movieId) {
       return {
         statusCode: 200,
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Credentials": true,
-          "Content-Type": "application/json",
-        },
+        headers: corsHeaders,
         body: JSON.stringify(movies),
       };
     }
@@ -25,11 +41,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     if (!movie) {
       return {
         statusCode: 404,
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Credentials": true,
-          "Content-Type": "application/json",
-        },
+        headers: corsHeaders,
         body: JSON.stringify({ message: "Movie not found" }),
       };
     }
@@ -38,22 +50,14 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     return {
       statusCode: 200,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Credentials": true,
-        "Content-Type": "application/json",
-      },
+      headers: corsHeaders,
       body: JSON.stringify({ movie, reviews: movieReviews }),
     };
   } catch (error) {
     console.error("Error fetching movie:", error);
     return {
       statusCode: 500,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Credentials": true,
-        "Content-Type": "application/json",
-      },
+      headers: corsHeaders,
       body: JSON.stringify({ message: "Internal Server Error" }),
     };
   }

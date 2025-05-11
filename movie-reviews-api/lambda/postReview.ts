@@ -1,73 +1,109 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
-import { dynamoDb } from "./dynamoClient";
-import { PutCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
 
-const tableName = process.env.TABLE_NAME!;
+const client = new DynamoDBClient({});
+const dynamoDb = DynamoDBDocumentClient.from(client);
+const tableName = process.env.MOVIE_REVIEWS_TABLE;
 
-// Common CORS headers
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*", // Or specify your frontend URL
+  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Credentials": true,
   "Content-Type": "application/json",
 };
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
-  // Handle OPTIONS request for CORS preflight
-  if (event.httpMethod === 'OPTIONS') {
+  if (event.httpMethod === "OPTIONS") {
     return {
       statusCode: 200,
       headers: {
         ...corsHeaders,
         "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
       },
       body: "",
     };
   }
 
+  if (!tableName) {
+    return {
+      statusCode: 500,
+      headers: corsHeaders,
+      body: JSON.stringify({ message: "Server configuration error: Table name missing" })
+    };
+  }
+
+  if (!event.body) {
+    return {
+      statusCode: 400,
+      headers: corsHeaders,
+      body: JSON.stringify({ message: "Request body is required" })
+    };
+  }
+
+  let requestBody;
   try {
-    if (!event.body) {
-      return {
-        statusCode: 400,
-        headers: corsHeaders,
-        body: JSON.stringify({ message: "Invalid request body" })
-      };
-    }
+    requestBody = JSON.parse(event.body);
+  } catch {
+    return {
+      statusCode: 400,
+      headers: corsHeaders,
+      body: JSON.stringify({ message: "Invalid JSON format" })
+    };
+  }
 
-    const { movieId, reviewerId, content } = JSON.parse(event.body);
+  const { movieId, reviewerId, content } = requestBody;
 
-    if (!movieId || !reviewerId || !content) {
-      return {
-        statusCode: 400,
-        headers: corsHeaders,
-        body: JSON.stringify({ message: "Missing required fields" })
-      };
-    }
+  const missingFields = [];
+  if (movieId === undefined || isNaN(movieId)) missingFields.push("movieId");
+  if (!reviewerId) missingFields.push("reviewerId");
+  if (!content) missingFields.push("content");
 
+  if (missingFields.length > 0) {
+    return {
+      statusCode: 400,
+      headers: corsHeaders,
+      body: JSON.stringify({
+        message: "Missing or invalid required fields",
+        missingFields
+      })
+    };
+  }
+
+  try {
     const reviewId = Date.now();
     const reviewDate = new Date().toISOString().split("T")[0];
 
-    const newReview = {
-      MovieId: movieId,
+    const reviewItem = {
+      MovieId: Number(movieId),
       ReviewId: reviewId,
       ReviewerId: reviewerId,
       ReviewDate: reviewDate,
-      Content: content,
+      Content: content
     };
 
-    await dynamoDb.send(new PutCommand({ TableName: tableName, Item: newReview }));
+    await dynamoDb.send(new PutCommand({
+      TableName: tableName,
+      Item: reviewItem
+    }));
 
     return {
       statusCode: 201,
       headers: corsHeaders,
-      body: JSON.stringify({ message: "Review added successfully", reviewId })
+      body: JSON.stringify({
+        message: "Review posted successfully",
+        reviewId,
+        review: reviewItem
+      })
     };
   } catch (error) {
-    console.error("Error adding review:", error);
     return {
       statusCode: 500,
       headers: corsHeaders,
-      body: JSON.stringify({ message: "Internal Server Error" })
+      body: JSON.stringify({
+        message: "Failed to post review",
+        error: error instanceof Error ? error.message : "Unknown error"
+      })
     };
   }
 };

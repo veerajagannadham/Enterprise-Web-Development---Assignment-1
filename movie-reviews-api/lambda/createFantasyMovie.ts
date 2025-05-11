@@ -5,33 +5,40 @@ import { v4 as uuidv4 } from 'uuid';
 const ddbClient = new DynamoDBClient({});
 const TABLE_NAME = process.env.TABLE_NAME!;
 
+// Define CORS headers - these will be added to all responses
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+  'Access-Control-Allow-Methods': 'OPTIONS,POST',
+  'Content-Type': 'application/json'
+};
+
 export const handler = async (
   event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResult> => {
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'OPTIONS,POST',
-  };
+  console.log('Received event:', JSON.stringify(event, null, 2));
 
+  // Handle OPTIONS preflight request (though API Gateway should handle this with the default CORS config)
   if (event.httpMethod === 'OPTIONS') {
     return {
       statusCode: 200,
       headers: corsHeaders,
-      body: '',
-    };
-  }
-
-  if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      headers: corsHeaders,
-      body: JSON.stringify({ message: 'Method Not Allowed' }),
+      body: ''
     };
   }
 
   try {
-    const body = JSON.parse(event.body || '{}');
+    if (!event.body) {
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({ message: 'Missing request body' })
+      };
+    }
+
+    const body = JSON.parse(event.body);
+    console.log('Request body:', body);
+    
     const {
       title,
       overview,
@@ -41,25 +48,44 @@ export const handler = async (
       runtime,
     } = body;
 
+    // Validate required fields
     if (!title || !overview || !Array.isArray(genres) || !releaseDate) {
       return {
         statusCode: 400,
         headers: corsHeaders,
-        body: JSON.stringify({ message: 'Missing or invalid fields' }),
+        body: JSON.stringify({ 
+          message: 'Missing or invalid required fields',
+          required: {
+            title: !!title,
+            overview: !!overview,
+            genres: Array.isArray(genres),
+            releaseDate: !!releaseDate
+          }
+        })
       };
     }
 
-    const movieId = uuidv4();
+    // Create a numeric ID for MovieId
+    const movieId = Math.floor(Math.random() * 10000000);
+    const reviewId = 0; // Default ReviewId as per schema
+    
+    // Create item using the correct types based on DynamoDB schema
     const item = {
-      MovieId: { S: movieId },
+      MovieId: { N: movieId.toString() },
+      ReviewId: { N: reviewId.toString() },
       Title: { S: title },
       Overview: { S: overview },
       ReleaseDate: { S: releaseDate },
       Genres: { SS: genres },
-      ProductionCompanies: { SS: productionCompanies || [] },
-      ...(runtime !== undefined && { Runtime: { N: String(runtime) } }),
+      ...(productionCompanies && productionCompanies.length > 0 && { 
+        ProductionCompanies: { SS: productionCompanies } 
+      }),
+      ...(runtime !== undefined && { Runtime: { N: runtime.toString() } }),
     };
 
+    console.log('Saving item to DynamoDB:', JSON.stringify(item, null, 2));
+
+    // Save to DynamoDB
     await ddbClient.send(
       new PutItemCommand({
         TableName: TABLE_NAME,
@@ -70,14 +96,22 @@ export const handler = async (
     return {
       statusCode: 201,
       headers: corsHeaders,
-      body: JSON.stringify({ message: 'Fantasy movie created', movieId }),
+      body: JSON.stringify({ 
+        message: 'Fantasy movie created successfully', 
+        movieId: movieId,
+        reviewId: reviewId
+      })
     };
   } catch (err) {
-    console.error('Error creating movie:', err);
+    console.error('Error creating fantasy movie:', err);
+    
     return {
       statusCode: 500,
       headers: corsHeaders,
-      body: JSON.stringify({ message: 'Internal server error' }),
+      body: JSON.stringify({ 
+        message: 'Internal server error',
+        error: (err instanceof Error) ? err.message : 'Unknown error' 
+      })
     };
   }
 };

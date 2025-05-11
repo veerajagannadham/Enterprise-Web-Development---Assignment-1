@@ -8,7 +8,7 @@
     "build": "tsc",
     "watch": "tsc -w",
     "test": "jest",
-    "cdk": "cdk", 
+    "cdk": "cdk",
     "deploy": "npm run build && cdk deploy"
   },
   "devDependencies": {
@@ -31,8 +31,13 @@
     "@aws-sdk/client-lambda": "^3.806.0",
     "@aws-sdk/client-translate": "^3.806.0",
     "@aws-sdk/lib-dynamodb": "^3.806.0",
+    "@aws-sdk/util-dynamodb": "^3.806.0",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/uuid": "^10.0.0",
     "aws-cdk-lib": "2.194.0",
     "aws-sdk": "^2.1692.0",
-    "constructs": "^10.0.0"
+    "bcryptjs": "^3.0.2",
+    "constructs": "^10.0.0",
+    "uuid": "^11.1.0"
   }
 }
