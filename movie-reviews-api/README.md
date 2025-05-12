@@ -1,6 +1,25 @@
 Here's the comprehensive API documentation with properly formatted endpoints and curl examples:
-
+## Enterprise Web Development module - Serverless REST Assignment.
 # Assignment 1 Movie API Documentation
+
+__Name:__ Veera
+
+__Demo:__ ... link to your YouTube video demonstration ......
+
+### Overview.
+
+This repository contains the AWS CDK infrastructure code for a Movie Reviews API, which allows users to authenticate using Amazon Cognito, submit movie reviews, update reviews, retrieve translations of reviews using AWS Translate, and store them in Amazon DynamoDB. The API is secured using API Gateway with Cognito Authorizer, and Lambda functions are used to process API requests.
+
+### App API endpoints.
+
+GET /movies – Retrieves a list of movies.
+
+POST /movies/reviews – Allows an authenticated user to submit a movie review.
+
+PUT /movies/{movieId}/reviews/{reviewId} – Allows an authenticated user to update their review.
+
+GET /reviews/{reviewId}/{movieId}/translation – Retrieves the translated version of a review.
+ 
 
 ## Base URL
 `https://y99h6zhtd2.execute-api.us-east-1.amazonaws.com/prod`
