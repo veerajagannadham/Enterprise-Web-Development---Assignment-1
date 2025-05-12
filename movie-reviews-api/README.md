@@ -1,6 +1,6 @@
 Here's the comprehensive API documentation with properly formatted endpoints and curl examples:
 
-# Movie API Documentation
+# Assignment 1 Movie API Documentation
 
 ## Base URL
 `https://y99h6zhtd2.execute-api.us-east-1.amazonaws.com/prod`
